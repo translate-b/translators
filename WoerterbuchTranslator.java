@@ -1,157 +1,219 @@
-package core.services.translators;
+package de.fungate.translate.core.services.translators;
 
 import com.google.inject.Inject;
-import core.models.SourceLanguage;
-import core.models.Translation;
-import core.services.Curler;
-import core.services.TranslationFactory;
-import core.services.Translator;
+import de.fungate.translate.core.models.SourceLanguage;
+import de.fungate.translate.core.models.Translation;
+import de.fungate.translate.core.services.Curler;
+import de.fungate.translate.core.services.MealyMachine;
+import de.fungate.translate.core.services.Regexes;
+import de.fungate.translate.core.services.Translator;
+import fj.F;
+import fj.P2;
 import fj.data.Either;
+import fj.data.Option;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.log4j.Logger;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-import java.util.*;
+import java.net.URISyntaxException;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+import static de.fungate.translate.core.services.MealyMachine.when;
+import static de.fungate.translate.core.services.Regexes.any;
+import static fj.P.p;
+import static fj.data.Option.some;
 
 /**
- * Translator for woerterbuch.info
+ * Translator implementation for woerterbuch.info
+ * @author Sebastian Graf
  */
 public class WoerterbuchTranslator implements Translator {
 
-    public static final String URL_FORMAT = "http://www.woerterbuch.info/?query=%s&s=dict&l=en";
+    public static final Pattern FILTER_ENGLISH = Pattern.compile(any(Regexes.INFINITIVE_TO, Regexes.PARENTHESIS));
+    public static final Pattern FILTER_GERMAN = Pattern.compile(Regexes.PARENTHESIS);
     private static final Logger LOG = Logger.getLogger(WoerterbuchTranslator.class);
-    private final TranslationFactory translationFactory;
-	private final Curler curler;
+    private final Curler curler;
 
+    /**
+     * Formats a URL as string for the given query term specific to woerterbuch.info.
+     * @param term to be translated.
+     * @return the ASCII-encoded URL.
+     */
+    public static String urlFor(String term) {
+        try {
+            return new URIBuilder()
+                    .setScheme("http")
+                    .setHost("www.woerterbuch.info")
+                    .setParameter("s", "dict") // as opposed to 'thesaurus', which would search for synonyms
+                    .setParameter("l", "en") // only from german to <l> where l is 'en', 'fr', etc.
+                    .setParameter("query", term)
+                    .build().toASCIIString();
+        } catch (URISyntaxException e) {
+            LOG.error("URI syntax is wrong, this needs a fix", e);
+            return "";
+        }
+    }
+
+    /**
+     * Instantiates a new WoerterbuchTranslator.
+     * @param curler used to issue get requests to a URL.
+     */
 	@Inject
-	public WoerterbuchTranslator(TranslationFactory translationFactory, Curler curler) {
-		this.translationFactory = translationFactory;
+	public WoerterbuchTranslator(Curler curler) {
 		this.curler = curler;
 	}
 
+    /**
+     * Translates the given term from the source language into the implicit complementary target language.
+     * @param term to be translated.
+     * @param source SourceLanguage in which the term is queried.
+     * @return the set of translations in the target language.
+     */
 	@Override
-	public Iterable<Translation> translate(String term, SourceLanguage source) {
+	public Set<Translation> translate(String term, SourceLanguage source) {
 		Either<String, Exception> content = curler.get(urlFor(term));
         if (content.isRight()) {
             // Get request failed and the right type is present. We can lookup the Exception
-            LOG.error("GET request failed.", content.right().value());
-            return Collections.emptyList();
+            LOG.warn("GET request failed.", content.right().value());
+            return Collections.emptySet();
         }
 
         // The left type is present, so the GET request was successful and
-        // we can parse the inner string value
-        Document doc = Jsoup.parse(content.left().value());
+        // we can extractTranslations the inner string value
+        return extractTranslations(source, Jsoup.parse(content.left().value()));
+	}
 
-        DirectHitsParser parser = new DirectHitsParser(translationFactory, source, getProvider());
+    @SuppressWarnings("unchecked")
+    private Set<Translation> extractTranslations(SourceLanguage source, Document doc) {
+        // The following machine parses only the direct hits out of the HTML soup.
+        MealyMachine<State, Element, Option<Translation>> parser = MealyMachine.fromTransitions(
+                State.BEFORE,
+                when(State.BEFORE).then(lookOutForSourceLangHeader(source)),
+                when(State.IN_SECTION).then(lookOutForDirectHitsHeader),
+                when(State.IN_DIRECT_HITS).then(parseDirectHits(source)),
+                when(State.FINISHED).then(doNothing)
+        );
+
+        // Just feed the relevant elements into the machine until it is finished.
+        // Thereby adding translations to the set.
+        Set<Translation> translations = new HashSet<>();
         for (Element e : doc.select("table table tr")) {
-            if (parser.isFinished()) {
+            if (parser.getState() == State.FINISHED) {
                 break;
             }
-            parser.step(e);
+            Option<Translation> t = parser.step(e);
+            if (t.isSome()) {
+                translations.add(t.some());
+            }
         }
 
         if (LOG.isTraceEnabled()) {
-            for (Translation t : parser.getTranslations()) {
+            for (Translation t : translations) {
                 LOG.trace(t);
             }
         }
 
-        return parser.getTranslations();
-	}
+        return translations;
+    }
 
-    private static String urlFor(String term) {
-        return String.format(URL_FORMAT, term);
+    private F<Element, P2<State, Option<Translation>>> lookOutForSourceLangHeader(final SourceLanguage source) {
+        return new F<Element, P2<State, Option<Translation>>>() {
+            public P2<State, Option<Translation>> f(Element tr) {
+                Element header = tr.select("td.standard").first();
+                State nextState = isSourceLangHeader(header, source) ? State.IN_SECTION : State.BEFORE;
+                return p(nextState, Option.<Translation>none());
+            }
+        };
+    }
+
+    private static F<Element, P2<State, Option<Translation>>> lookOutForDirectHitsHeader = new F<Element, P2<State, Option<Translation>>>() {
+        public P2<State, Option<Translation>> f(Element tr) {
+            Element subHeader = tr.select("td.standard").first();
+            State nextState = isDirectHitsHeader(subHeader)
+                    ? State.IN_DIRECT_HITS : State.IN_SECTION;
+            return p(nextState, Option.<Translation>none());
+        }
+    };
+
+    private F<Element, P2<State, Option<Translation>>> parseDirectHits(final SourceLanguage source) {
+        return new F<Element, P2<State, Option<Translation>>>() {
+            public P2<State, Option<Translation>> f(Element tr) {
+                Elements columns = tr.select("td.hl");
+                if (columns.size() < 2) { // we hit the end of the section
+                    return p(State.FINISHED, Option.<Translation>none());
+                }
+                // left column is english, right is german
+                String english = filterEnglish(columns.get(source == SourceLanguage.ENGLISH ? 0 : 1).text());
+                String german = filterGerman(columns.get(source == SourceLanguage.GERMAN ? 0 : 1).text());
+                return p(State.IN_DIRECT_HITS, some(new Translation(english, german)));
+            }
+        };
+    }
+
+    private static F<Element, P2<State, Option<Translation>>> doNothing = new F<Element, P2<State, Option<Translation>>>() {
+        public P2<State, Option<Translation>> f(Element tr) {
+            return p(State.FINISHED, Option.<Translation>none());
+        }
+    };
+
+    private static boolean isSourceLangHeader(Element header, SourceLanguage lang) {
+        if (header == null) {
+            return false;
+        }
+        switch (lang) {
+            case ENGLISH:
+                return header.text().toLowerCase().equals("englisch");
+            case GERMAN:
+                return header.text().toLowerCase().equals("deutsch");
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isDirectHitsHeader(Element subHeader) {
+        return subHeader != null && subHeader.text().toLowerCase().startsWith("direkte");
+    }
+
+    private static String filterGerman(String term) {
+        return FILTER_GERMAN.matcher(term).replaceAll("").trim();
+    }
+
+    private static String filterEnglish(String term) {
+        return FILTER_ENGLISH.matcher(term).replaceAll("").trim();
     }
 
     @Override
-	public String getProvider() {
-		return "woerterbuch.info";
-	}
-
-    /**
-     * Finit state machine for parsing out the actual direct hits of the table
-     */
-    private static class DirectHitsParser {
-
-        private final List<Translation> translations = new ArrayList<>();
-        private final TranslationFactory translationFactory;
-        private final SourceLanguage source;
-        private final String provider;
-        private State state = State.BEFORE;
-
-        public List<Translation> getTranslations() {
-            return translations;
-        }
-
-        public boolean isFinished() {
-            return state == State.FINISHED;
-        }
-
-        public DirectHitsParser(TranslationFactory translationFactory, SourceLanguage source, String provider) {
-            this.translationFactory = translationFactory;
-            this.source = source;
-            this.provider = provider;
-        }
-
-        public void step(Element tr) {
-            switch (state) {
-                case BEFORE:
-                    Element header = tr.select("td.standard").first();
-                    if (isSourceLangHeader(header, source)) {
-                        state = State.IN_SECTION;
-                    }
-                    break;
-                case IN_SECTION:
-                    Element subHeader = tr.select("td.standard").first();
-                    if (subHeader != null && subHeader.text().toLowerCase().startsWith("direkte")) {
-                        state = State.IN_DIRECT_HITS;
-                    }
-                    break;
-                case IN_DIRECT_HITS:
-                    Elements columns = tr.select("td.hl");
-                    if (columns.size() < 2) { // we hit the end of the section
-                        state = State.FINISHED;
-                        break;
-                    } else {
-                        // left column is english, right is german
-                        String english = trimEnglish(columns.get(source == SourceLanguage.ENGLISH ? 0 : 1).text());
-                        String german = columns.get(source == SourceLanguage.GERMAN ? 0 : 1).text();
-                        translations.add(translationFactory.makeTranslation(english, german, provider, ""));
-                    }
-                    break;
-                case FINISHED:
-                    break;
-            }
-        }
-
-        private static String trimEnglish(String term) {
-            // ^to\s+ matches every "to " at the beginning of the string
-            // \(\w+\.\) matches every "(Am.)" and similar string
-            return term.replaceAll("(^to\\s+|\\(\\w+\\.\\))", "").trim();
-        }
-
-        private static boolean isSourceLangHeader(Element header, SourceLanguage lang) {
-            if (header == null) {
-                return false;
-            }
-            switch (lang) {
-                case ENGLISH:
-                    return header.text().toLowerCase().equals("englisch");
-                case GERMAN:
-                    return header.text().toLowerCase().equals("deutsch");
-                default:
-                    return false;
-            }
-        }
-
-        private enum State {
-            BEFORE,
-            IN_SECTION,
-            IN_DIRECT_HITS,
-            FINISHED
-        }
+    public String getProvider() {
+        return "woerterbuch.info";
     }
 
+    private enum State {
+
+        /**
+         * Last table row was before the relevant section
+         */
+        BEFORE,
+
+        /**
+         * Last table row was in a nonrelevant section
+         */
+        IN_SECTION,
+
+        /**
+         * Last table row was in direct hits
+         */
+        IN_DIRECT_HITS,
+
+        /**
+         * Last table row was beyond direct hits
+         */
+        FINISHED
+
+    }
 }
