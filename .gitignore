@@ -1,0 +1,7 @@
+*
+# All files are ignored, except those mentioned in the following white list (note that ! unignores the following pattern)
+!.gitignore
+!README.md
+!build.sbt
+!src/
+!src/**
