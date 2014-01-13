@@ -4,4 +4,5 @@
 !README.md
 !build.sbt
 !src/
-!src/**src/**.DS_Store
+!src/**
+src/**.DS_Store
