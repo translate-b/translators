@@ -53,9 +53,9 @@ public class DictccTranslator implements Translator{
      * into the web Elements.
      * Prints an error-message if connection failed.
      * Returns the empty string, if there is no value present in content.
-     * @param term
-     * @param source
-     * @return Set<Translation>
+     * @param term to be translated
+     * @param src sourcelanguage enumeration
+     * @return <Translation> a Set of translations
      */
 	@Override
 	public Set<Translation> translate(String term, SourceLanguage source) {
@@ -74,7 +74,7 @@ public class DictccTranslator implements Translator{
 	
 	/**
 	 * Set the current provider to Dictcc (Depending on this crawler).
-	 * @return String
+	 * @return string of providername
 	 */
 	@Override
 	public String getProvider() {
@@ -85,10 +85,10 @@ public class DictccTranslator implements Translator{
      * Builds the URL to access dictcc Website via Curler (conURL) via Sourcelanguage.
      * Handles the terms, which is delivered in the url of the Website
      * and cases with term out of more than one word.
-     * @param term
-     * @param url
-     * @param source
-     * @return String>
+     * @param term to be translated
+     * @param url containing the page-URL 
+     * @param source sourcelangueage enumeration
+     * @return connection-url to open the result-page at provider website
      */
     private String buildConnectionUrl(String term, String url, SourceLanguage source){
     	//connecting to term-search via URL: "http://www.dict.cc/?s=" + term
@@ -111,8 +111,8 @@ public class DictccTranslator implements Translator{
     /**
      * Crawls the Dict.cc-Webpage by using defined html-selectors and build a Set
      * of translations (Englisch, German).
-     * @param newdoc
-     * @return Set<Translation>
+     * @param newdoc reperesentation of result-page at provider website
+     * @return <Translation> a Set of translations
      */
     private Set<Translation> crawl(Document newdoc){
 		//row passing through and line passing through in content table of dictcc:
@@ -138,8 +138,8 @@ public class DictccTranslator implements Translator{
      * Cascadet filter for the translated terms.
      * Uses some Regex-Pattern to replace unimportent or 
      * undesirable content wit whitespace and trim it to term-length.
-     * @param input
-     * @return String
+     * @param input unfiltered terms
+     * @return filtered terms
      */
     private String toStringFiltre(String input) {
         // Filter until we found the fix point at which no more garbage can be deleted

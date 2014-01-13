@@ -1,6 +1,7 @@
 package de.fungate.translate.core.services.translators;
 
 
+import com.google.inject.Inject;
 import de.fungate.translate.core.models.SourceLanguage;
 import de.fungate.translate.core.models.Translation;
 import de.fungate.translate.core.services.Curler;
@@ -36,6 +37,7 @@ public class LeoTranslator implements Translator {
     private static final XPathExpression GERMAN_XPATH = compileXPath("//entry//side[@lang='de']//words/word[1]/text()");
     private static final XPathExpression ENGLISH_XPATH = compileXPath("//entry//side[@lang='en']//words/word[1]/text()");
 
+    @Inject
     public LeoTranslator(Curler curler) {
         this.curler = curler;
     }
@@ -44,8 +46,8 @@ public class LeoTranslator implements Translator {
     /**
      * Gets the translations for the term in the given source language 
      * @ param term to be translated
-     * @ param the SourceLanguange src of the given term
-     * @ return set containing pairs of translations
+     * @ param src SourceLanguange of the given term
+     * @ return the set containing pairs of translations
      */
     @Override
     public Set<Translation> translate(String term, SourceLanguage src) {
@@ -70,8 +72,8 @@ public class LeoTranslator implements Translator {
     /**
      * builds the url for the term in the given source language
      * @param term to be translated
-     * @param SourceLanguage src of the given term
-     * @return URL for the term translations 
+     * @param src SourceLanguage of the given term
+     * @return the URL for the term translations 
      */
     public String buildURL(String term, SourceLanguage src) {
         try {
@@ -90,7 +92,7 @@ public class LeoTranslator implements Translator {
      * Crawls the given content to return a set of translations found
      * @param content 
      * @param limit restricting the number of translations
-     * @return set of crawled translations
+     * @return the set of crawled translations
      */
     private Set<Translation> crawl(Either<InputStream, Exception> content, int limit)
             throws XPathExpressionException, IOException, SAXException {
@@ -128,8 +130,8 @@ public class LeoTranslator implements Translator {
 
     /**
      * Filters possible articels of given word out
-     * @param given word
-     * @return filtered word
+     * @param word
+     * @return the filtered word
      */
     private String filter(String word){
 		

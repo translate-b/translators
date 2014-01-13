@@ -1,8 +1,8 @@
 package de.fungate.translate.core.services;
 
 /**
- * @author Eike Karsten Schlicht
  * This class defines some common regexes to filter the website content.
+ * @author Eike Karsten Schlicht
  */
 public abstract class Regexes {
 
@@ -93,7 +93,7 @@ public abstract class Regexes {
     public static final String INFINITIVE_TO = "^\\s*to\\s+";
     
     /**
-     * Matches all double Whitespaces
+     * Matches all double and triple Whitespaces
      */
     public static final String DUPLICATE_WHITESPACE = "[(\\s\\s) | (\\s\\s\\s)]";
 }
