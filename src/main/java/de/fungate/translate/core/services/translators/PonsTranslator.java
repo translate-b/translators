@@ -1,6 +1,7 @@
 package de.fungate.translate.core.services.translators;
 
 
+import com.google.inject.Inject;
 import de.fungate.translate.core.models.SourceLanguage;
 import de.fungate.translate.core.models.Translation;
 import de.fungate.translate.core.services.Curler;
@@ -21,188 +22,265 @@ import java.util.*;
 import java.util.regex.Pattern;
 import static de.fungate.translate.core.services.Regexes.any;
 
+/**
+ * Translator implementation for the pons provider
+ * @author Kader Pustu
+ *
+ */
+
 public class PonsTranslator implements Translator {
-	
-	private final Curler curler;
-	private static final String CONNECTION_ERROR = "Es konnte keine Verbindung zu de.pons.eu hergestellt werden!";
+
+    private final Curler curler;
+    private static final String CONNECTION_ERROR = "Es konnte keine Verbindung zu de.pons.eu hergestellt werden!";
     private static final Logger LOG = Logger.getLogger(PonsTranslator.class);
+    private static final int LIMIT = 15;
 
-	public PonsTranslator(Curler curler) {
-		this.curler = curler;
-	}
-	
-	@Override
-	public Set<Translation> translate(String term, SourceLanguage src) {
-		String url  = buildURL(term,src);
-		Either<String, Exception> content = curler.get(url);
-		
-		if (content.isLeft() && !term.isEmpty()) { 
-			
-			return crawl(term,src,content);
-			
-		} else {
-			LOG.warn(CONNECTION_ERROR, content.right().value());
-			return Collections.emptySet();
-		}	
-	}
-	
-	public String buildURL(String term, SourceLanguage src){
-		String url = "http://de.pons.eu/dict/search/results/?q=";
-		while (term.contains(" ")) {
-			url = url + term.substring(0, term.indexOf(" ")) + "+";
-			term = term.substring(term.indexOf(" ") + 1);
-		}
-		url = url + term + "&l=deen&in=" + changeSourceLanguage(src) + "&lf="  + changeSourceLanguage(src);
-		
-		return url;
-	}
-	
-	private String changeSourceLanguage(SourceLanguage src){
-		if(src.equals(SourceLanguage.GERMAN)){
-			return "de";
-		}
-		else return "en";	
-	}
+    @Inject
+    public PonsTranslator(Curler curler) {
+        this.curler = curler;
+    }
 
-	
-	private Set<Translation> crawl(String term, SourceLanguage src , Either<String, Exception> content){
-		
-		Set<Translation> s = new HashSet<Translation>();
-		Document doc = Jsoup.parse(content.left().value());                    
-		
-		for (Element ele : doc.getElementsByClass("alert")){
-			if (ele.attr("class").equals("alert notice fuzzysearch"))
-				return s;
-		}
-		
-		String translations = doc.getElementsByClass("translations").html();
-		int sizeTranslations = doc.getElementsByClass("translations").size();
-		Document translationsDoc = Jsoup.parse(translations);                        
-		Elements h3 = translationsDoc.select("h3");   
-		
-		String source, target;
-	
-		if(sizeTranslations != 0){
-			for(int i= 0; i < sizeTranslations;i++) {	
-				if(h3.get(i).text().toLowerCase().contains(term.toLowerCase()) || h3.get(i).toString().contains("empty hidden")){          
-					Document iTranslationsDoc = Jsoup.parse(doc.getElementsByClass("translations").get(i).html());
-					for (int j = 0; j < iTranslationsDoc.getElementsByClass("source").size(); j++) {
+    /**
+     * Gets the translations for the term in the given source language 
+     * @ param term to be translated
+     * @ param src SourceLanguange of the given term
+     * @ return the set containing pairs of translations
+     */
+    @Override
+    public Set<Translation> translate(String term, SourceLanguage src) {
+        String url = buildURL(term, src);
+        Either<String, Exception> content = curler.get(url);
 
-							source = iTranslationsDoc.getElementsByClass("source").get(j).text();
-							target = iTranslationsDoc.getElementsByClass("dd-inner").get(j).html();
-							Document targetDocument = Jsoup.parse(target);
-							target = targetDocument.getElementsByClass("target").text();
-						if(src.equals(SourceLanguage.GERMAN)){	
-							if(iTranslationsDoc.getElementsByClass("source").get(j).html().contains("deutsch-englisch")){ 
-								s.add(new Translation(filter(target), filter(source)));
-							}else {
-								s.add(new Translation(filter(source), filter(target)));
-							}
-						}
-						else {
-							if(iTranslationsDoc.getElementsByClass("source").get(j).html().contains("englisch-deutsch")){
-								s.add(new Translation(filter(source), filter(target)));
-								}
-								else {
-									s.add(new Translation(filter(target), filter(source)));
-								}
-						}
-					}	
-				}
-			}
-		}else{
-			translationsDoc = Jsoup.parse(doc.getElementsByAttribute("data-translation").html());
-			for (int j = 0; j < translationsDoc.getElementsByClass("source").size(); j++) {
-				
-				
-				source = translationsDoc.getElementsByClass("source").get(j).text();
-				target = translationsDoc.getElementsByClass("dd-inner").get(j).html();
-				Document targetDocument = Jsoup.parse(target);
-				target = targetDocument.getElementsByClass("target").text();
-					
-				if(src.equals(SourceLanguage.GERMAN)){	
-					if(translationsDoc.getElementsByClass("source").get(j).html().contains("deutsch-englisch")){ 
-						s.add(new Translation(filter(target), filter(source)));
-					}else {
-						s.add(new Translation(filter(source), filter(target)));
-					}
-				}
-				else {
-					if(translationsDoc.getElementsByClass("source").get(j).html().contains("englisch-deutsch")){
-						s.add(new Translation(filter(source), filter(target)));
-					}
-					else {
-						s.add(new Translation(filter(target), filter(source)));
-					}	
-				}
-			}
-		}
-		return s;
+        if (content.isLeft() && !term.isEmpty()) {
+
+            return crawl(term, src, content);
+
+        } else {
+            LOG.warn(CONNECTION_ERROR, content.right().value());
+            return Collections.emptySet();
+        }
+    }
+
+    /**
+     * builds the url for the term in the given source language
+     * @param term to be translated
+     * @param src SourceLanguage of the given term
+     * @return the URL for the term translations 
+     */
+    public String buildURL(String term, SourceLanguage src) {
+        String url = "http://de.pons.eu/dict/search/results/?q=";
+        while (term.contains(" ")) {
+            url = url + term.substring(0, term.indexOf(" ")) + "+";
+            term = term.substring(term.indexOf(" ") + 1);
+        }
+        url = url + term + "&l=deen&in=" + changeSourceLanguage(src) + "&lf="
+                + changeSourceLanguage(src);
+
+        return url;
+    }
+
+    private String changeSourceLanguage(SourceLanguage src) {
+        if (src.equals(SourceLanguage.GERMAN)) {
+            return "de";
+        } else
+            return "en";
+    }
+
+    /**
+     * Crawls the given content to return a set of translations found
+     * @param term to be translated
+     * @param src SourceLanguage of the term
+     * @param content
+     * @return the set of crawled translations
+     */
+    private Set<Translation> crawl(String term, SourceLanguage src,
+                                   Either<String, Exception> content) {
+
+        Set<Translation> s = new HashSet<Translation>();
+        Document doc = Jsoup.parse(content.left().value());
+
+        if(!isActualTermTranslation(doc)) return s;
+
+        int classTranslationsSize = doc.select(".translations").size();
+
+        Elements h3Elements = doc.select(".translations h3");
+
+        if (classTranslationsSize != 0) {
+            for (int i = 0; i < classTranslationsSize; i++) {
+
+                if (s.size() >= LIMIT) return s;
+                // further eliminition of translations to wrong terms
+                if (h3Elements.get(i).text().toLowerCase()
+                        .contains(term.toLowerCase())
+                        || h3Elements.get(i).toString()
+                        .contains("empty hidden")) {
+
+                    Elements sourceElements = doc.select(".translations")
+                            .get(i).select(".source");
+                    Elements ddInnerElements = doc.select(".translations")
+                            .get(i).select(".dd-inner");
+                    s = parseTranslation(s, src, sourceElements,
+                            ddInnerElements);
+                }
+            }
+            return s;
+        } else {
+
+            Elements sourceElements = doc.select("[data-translation] .source");
+            Elements ddInnerElements = doc
+                    .select("[data-translation] .dd-inner");
+            s = parseTranslation(s, src, sourceElements, ddInnerElements);
+
+        }
+        return s;
+    }
+
+    /**
+     * examination whether translations for given term or only similar term
+     * translations are available
+     * @param doc the document to be crawled
+     * @return boolean true if document contains the actual translations for term
+     */
+    public boolean isActualTermTranslation(Document doc){
+        for (Element element : doc.getElementsByClass("alert")) {
+            if (element.attr("class").equals("alert notice fuzzysearch"))
+                return false;
+        }
+        return true;
+    }
+
+
+    /**
+     * parses the final translation pairs
+     * @param s set of translations
+     * @param src SourceLanguage of the former term
+     * @param sourceElements terms in the source language
+     * @param ddInnerElements translations in the target language
+     * @return the set of translations
+     */
+    private Set<Translation> parseTranslation(Set<Translation> s,
+                                              SourceLanguage src, Elements sourceElements,
+                                              Elements ddInnerElements) {
+
+        for (int j = 0; j < sourceElements.size(); j++) {
+
+            if (s.size() >= LIMIT)
+                return s;
+
+            String sourceTerm = sourceElements.get(j).text();
+            String targetTerm = ddInnerElements.get(j).select(".target").text();
+            // if clause when german search has been executed
+            if (src.equals(SourceLanguage.GERMAN)) {
+                if (sourceElements.get(j).html().contains("deutsch-englisch")) {
+                    s.add(new Translation(filter(targetTerm),
+                            filter(sourceTerm)));
+                } else {
+                    s.add(new Translation(filter(sourceTerm),
+                            filter(targetTerm)));
+                }
+                // else clause when english search has been executed
+            } else {
+                if (sourceElements.get(j).html().contains("englisch-deutsch")) {
+                    s.add(new Translation(filter(sourceTerm),
+                            filter(targetTerm)));
+                } else {
+                    s.add(new Translation(filter(targetTerm),
+                            filter(sourceTerm)));
+                }
+            }
+        }
+        return s;
+    }
+
+    /**
+     * Filters out inapproriate characters and brackets returning the filtered term
+     * @param word
+     * @return the filtered term
+     */
+    private String filter(String word) {
+        final Pattern MATCH_GARBAGE = Pattern.compile(any(Regexes.PARENTHESIS));
+
+        String[] wordCase = { "der", "die", "das", "the", "derb", "dial", "nt",
+                "(in)", "(f)", "(m)", "Am", "Brit", "liter", "old", "dial",
+                "nordd", "pej", "also fig", "fam", "dat", "fig", "geh", "form",
+                "fam!", "ASTRON", "GASTR", "ELEC", "MILIT", "prov",
+                "vulg", "südd", "akk", "indef", "art", "Bsp", "prov", "attr",
+                "pl", "gen", "+ sing", "vb", "m", "f", "sl", "nt", "Auto" };
+
+        List<Pair> wordPairs = new ArrayList<Pair>();
+
+        for (String s : wordCase)
+            wordPairs.add(getPairForOneWord(s));
+
+        wordPairs.add(new Pair("a.", "a\\."));
+        wordPairs.add(new Pair("+akk", "\\+akk"));
+
+
+        StringBuilder sb = new StringBuilder(word);
+
+        // square brackets are removed
+        while (word.contains("[")) {
+            if (word.lastIndexOf("]") + 2 < word.length())
+                word = sb.delete(word.lastIndexOf("["),
+                        word.indexOf("]", word.lastIndexOf("[")) + 2)
+                        .toString();
+            else
+                word = sb.delete(word.lastIndexOf("["),
+                        word.indexOf("]", word.lastIndexOf("[")) + 1)
+                        .toString();
+        }
+
+        // parantheses are removed
+        word = MATCH_GARBAGE.matcher(word).replaceAll("").trim();
+
+        // inappropriate words matching the array content are removed
+        for (Pair wordPair : wordPairs) {
+            String pairWord = wordPair.getWord();
+            String pairRegex = wordPair.getRegex();
+            if (word.contains(" " + pairWord + " ")
+                    || word.startsWith(pairWord + " ")
+                    || word.endsWith(" " + pairWord)) {
+                word = word.replaceAll(pairRegex, "").trim();
+            }
+        }
+
+        // "⇆" is removed
+        word = word
+                .replaceAll(
+                        "[^\\p{ASCII}\\u00E4\\u00F6\\u00FC\\u00C4\\u00D6\\u00DC\\u00DF]",
+                        "");
+
+        // double whitespaces are removed
+        word = word.replaceAll("\\s+", " ");
+
+        return word;
+    }
+
+    private Pair getPairForOneWord(String word) {
+        return new Pair(word, word);
+    }
+
+    public String getProvider() {
+        return "pons.eu";
+    }
+
 }
 
-	
+class Pair {
+    private String word;
+    private String regex;
 
-	private String filter(String word){
-		final Pattern MATCH_GARBAGE = Pattern.compile(any(Regexes.PARENTHESIS));
-		 
-		String[] wordCase = { "der", "die", "das", "the", "derb","dial", "nt", "(in)", "(f)", "(m)","Am", "Brit", "liter", "old", "dial", "nordd", "pej", "also fig","fam", "dat", "fig", "geh", "form", "fam!", "ASTRON", "GASTR",
-							"ELEC", "⇆", "MILIT","prov", "vulg", "südd", "akk", "indef" , "art", "Bsp", "prov", "attr", "pl", "gen", "+ sing", "vb", "m", "f", "sl", "nt", "Auto"};
-		
-		List<Pair> wordPairs = new ArrayList<Pair>();
-		
-		for (String s : wordCase)
-			wordPairs.add(getPairForOneWord(s));
+    public Pair(String word, String regex) {
+        this.word = word;
+        this.regex = regex;
+    }
 
-		wordPairs.add(new Pair("a.", "a\\."));
-		wordPairs.add(new Pair("+akk", "+akk\\"));
-		
-		StringBuilder test = new StringBuilder(word);
-		
-		while(word.contains("[")){			
-			if(word.lastIndexOf("]") + 2 < word.length())
-				word = test.delete(word.lastIndexOf("[") , word.indexOf("]", word.lastIndexOf("["))+2 ).toString();
-			else
-				word = test.delete(word.lastIndexOf("[") , word.indexOf("]", word.lastIndexOf("["))+1 ).toString();
-		}
-	
-		word = MATCH_GARBAGE.matcher(word).replaceAll("").trim();
-		
-		for(int i = 0; i <wordPairs.size(); i++){
-			String pairword = wordPairs.get(i).getWord();
-			String pairregex = wordPairs.get(i).getRegex();
-			if(word.contains(" " + pairword + " ") || word.startsWith(pairword + " ") || word.endsWith(" " + pairword)){
-				word = word.replaceAll(pairregex, "").trim();
-			}
-		}
-		word = word.replaceAll("\\s+", " ");
-		return word;
-		}
-	
-	private Pair getPairForOneWord(String word){
-		return new Pair(word, word);
-	}
+    public String getWord() {
+        return this.word;
+    }
 
-	public String getProvider() {
-		return "pons.eu";
-	}
+    public String getRegex() {
+        return this.regex;
+    }
 
-
-}
-
-class Pair{
-	private String word;
-	private String regex;
-	
-	public Pair(String word, String regex){
-		this.word = word;
-		this.regex = regex;
-	}
-	
-	public String getWord() {
-		return this.word;
-	}
-	public String getRegex() {
-		return this.regex;
-	}
-	
 }
