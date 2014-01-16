@@ -73,10 +73,9 @@ public class GoogleTranslator implements Translator {
 	 * Returns a Set of translation for the parsed content given in an ArrayList
 	 * of Strings and the depending source language and return a set of translation.
 	 * @param parse ArrayList<String> of the relevant part of the JSON response
-	 * @param SourceLanguage of the term
+	 * @param source of the term
 	 * @return Set<Translation> of translations
 	 */
-	
 	private Set<Translation> buildresult(ArrayList<String> parse,
 			SourceLanguage source) {
 
@@ -157,7 +156,7 @@ public class GoogleTranslator implements Translator {
 	 */
 	private ArrayList<String> parse(String response) {
 
-		ArrayList<String> result = new ArrayList<String>();
+		ArrayList<String> result = new ArrayList<>();
 
 		Object jsonresponse = JSONValue.parse(response);
 		JSONArray array = (JSONArray) jsonresponse;

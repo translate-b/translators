@@ -1,21 +1,20 @@
 package de.fungate.translate.core.services.synonymproviders;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.util.HashSet;
-import java.util.Set;
-
 import com.google.inject.Inject;
+import de.fungate.translate.core.models.SourceLanguage;
+import de.fungate.translate.core.services.Curler;
+import de.fungate.translate.core.services.SynonymProvider;
+import fj.data.Either;
 import org.apache.log4j.Logger;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-import de.fungate.translate.core.models.SourceLanguage;
-import de.fungate.translate.core.services.Curler;
-import de.fungate.translate.core.services.SynonymProvider;
-import fj.data.Either;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Class to get synonyms from a german or english term from Woxikon

@@ -15,7 +15,10 @@ import org.jsoup.select.Elements;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import static de.fungate.translate.core.services.Regexes.any;
@@ -54,7 +57,7 @@ public class DictccTranslator implements Translator{
      * Prints an error-message if connection failed.
      * Returns the empty string, if there is no value present in content.
      * @param term to be translated
-     * @param src sourcelanguage enumeration
+     * @param source sourcelanguage enumeration
      * @return <Translation> a Set of translations
      */
 	@Override
@@ -149,6 +152,7 @@ public class DictccTranslator implements Translator{
             input = MATCH_GARBAGE.matcher(input).replaceAll("");
             foundFixPoint = before.equals(input);
         }
-    	return input.trim();
+        // whitespaces is normalised
+    	return input.replaceAll(Regexes.WHITESPACE, " ").trim();
     }
 }

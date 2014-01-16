@@ -4,7 +4,7 @@ import javax.annotation.Nonnull;
 
 /**
  * Domain model representing a translation. That is, a pair of an english and a german term.
- * @author Sebastian Graf
+ * @author Florian Supplie
  */
 public class Translation implements Comparable<Translation> {
 

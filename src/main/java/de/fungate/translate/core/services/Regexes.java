@@ -93,7 +93,7 @@ public abstract class Regexes {
     public static final String INFINITIVE_TO = "^\\s*to\\s+";
     
     /**
-     * Matches all double and triple Whitespaces
+     * Matches all white space
      */
-    public static final String DUPLICATE_WHITESPACE = "[(\\s\\s) | (\\s\\s\\s)]";
+    public static final String WHITESPACE = "\\s+";
 }

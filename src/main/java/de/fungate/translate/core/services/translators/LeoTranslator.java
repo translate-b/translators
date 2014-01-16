@@ -5,6 +5,7 @@ import com.google.inject.Inject;
 import de.fungate.translate.core.models.SourceLanguage;
 import de.fungate.translate.core.models.Translation;
 import de.fungate.translate.core.services.Curler;
+import de.fungate.translate.core.services.Regexes;
 import de.fungate.translate.core.services.Translator;
 import fj.data.Either;
 import org.apache.log4j.Logger;
@@ -135,14 +136,15 @@ public class LeoTranslator implements Translator {
      */
     private String filter(String word){
 		
-		String[] wordCase = { "der", "die", "das", "the" };
-		
-		for(int i = 0; i <wordCase.length; i++){
-			if(word.startsWith(wordCase[i] + " ")){
-				word = word.replaceAll(wordCase[i], "").trim();
-			}
-		}
-		return word;
+		String[] wordCases = { "der", "die", "das", "the" };
+
+        for (String wordCase : wordCases) {
+            if (word.startsWith(wordCase + " ")) {
+                word = word.replaceAll(wordCase, "").trim();
+            }
+        }
+        // normalize whitespace
+		return word.replaceAll(Regexes.WHITESPACE, " ");
 	}
     
     private String changeSourceLanguage(SourceLanguage src) {

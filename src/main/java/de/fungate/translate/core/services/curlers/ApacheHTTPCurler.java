@@ -9,6 +9,7 @@ import java.io.InputStream;
 
 /**
  * Curler using the ApacheHTTPClient libraries to fulfill its duties.
+ * @author Eike Karsten Schlicht
  */
 public class ApacheHTTPCurler implements Curler {
 

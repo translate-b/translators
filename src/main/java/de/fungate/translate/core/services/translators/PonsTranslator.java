@@ -5,8 +5,8 @@ import com.google.inject.Inject;
 import de.fungate.translate.core.models.SourceLanguage;
 import de.fungate.translate.core.models.Translation;
 import de.fungate.translate.core.services.Curler;
-import de.fungate.translate.core.services.Translator;
 import de.fungate.translate.core.services.Regexes;
+import de.fungate.translate.core.services.Translator;
 import fj.data.Either;
 import org.apache.log4j.Logger;
 import org.jsoup.Jsoup;
@@ -14,12 +14,9 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 import java.util.*;
 import java.util.regex.Pattern;
+
 import static de.fungate.translate.core.services.Regexes.any;
 
 /**
@@ -96,7 +93,7 @@ public class PonsTranslator implements Translator {
     private Set<Translation> crawl(String term, SourceLanguage src,
                                    Either<String, Exception> content) {
 
-        Set<Translation> s = new HashSet<Translation>();
+        Set<Translation> s = new HashSet<>();
         Document doc = Jsoup.parse(content.left().value());
 
         if(!isActualTermTranslation(doc)) return s;
@@ -200,20 +197,25 @@ public class PonsTranslator implements Translator {
     private String filter(String word) {
         final Pattern MATCH_GARBAGE = Pattern.compile(any(Regexes.PARENTHESIS));
 
-        String[] wordCase = { "der", "die", "das", "the", "derb", "dial", "nt",
-                "(in)", "(f)", "(m)", "Am", "Brit", "liter", "old", "dial",
-                "nordd", "pej", "also fig", "fam", "dat", "fig", "geh", "form",
-                "fam!", "ASTRON", "GASTR", "ELEC", "MILIT", "prov",
-                "vulg", "südd", "akk", "indef", "art", "Bsp", "prov", "attr",
-                "pl", "gen", "+ sing", "vb", "m", "f", "sl", "nt", "Auto" };
+		String[] wordCase = { "derb", "dial", "nt", "(in)", "(f)", "(m)", "Am",
+				"Brit", "liter", "old", "dial", "nordd", "pej", "also fig",
+				"fam", "dat", "fig", "geh", "form", "fam!", "ASTRON", "GASTR",
+				"ELEC", "MILIT", "prov", "vulg", "südd", "akk", "indef", "art",
+				"Bsp", "prov", "attr", "pl", "gen", "+ sing", "vb", "m", "f",
+				"sl", "nt", "Auto", "GEOG", "sep", "no art"};
+        
+        String[] articles = { "der", "die", "das", "the" };
 
-        List<Pair> wordPairs = new ArrayList<Pair>();
+        List<Pair> wordPairs = new ArrayList<>();
 
         for (String s : wordCase)
             wordPairs.add(getPairForOneWord(s));
 
         wordPairs.add(new Pair("a.", "a\\."));
         wordPairs.add(new Pair("+akk", "\\+akk"));
+        wordPairs.add(new Pair("+ sing", "\\+ sing"));
+        wordPairs.add(new Pair(", no", "\\, no"));
+        
 
 
         StringBuilder sb = new StringBuilder(word);
@@ -243,6 +245,12 @@ public class PonsTranslator implements Translator {
                 word = word.replaceAll(pairRegex, "").trim();
             }
         }
+        
+        //articles at the beginning of the term are removed
+        for(String article : articles){
+        	if(word.startsWith(article + " "))
+        		word = word.replaceAll(article, "").trim();	
+        }
 
         // "⇆" is removed
         word = word
@@ -250,8 +258,8 @@ public class PonsTranslator implements Translator {
                         "[^\\p{ASCII}\\u00E4\\u00F6\\u00FC\\u00C4\\u00D6\\u00DC\\u00DF]",
                         "");
 
-        // double whitespaces are removed
-        word = word.replaceAll("\\s+", " ");
+        // whitespaces is normalised
+        word = word.replaceAll(Regexes.WHITESPACE, " ");
 
         return word;
     }
@@ -267,8 +275,8 @@ public class PonsTranslator implements Translator {
 }
 
 class Pair {
-    private String word;
-    private String regex;
+    private final String word;
+    private final String regex;
 
     public Pair(String word, String regex) {
         this.word = word;

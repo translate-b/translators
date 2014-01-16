@@ -8,7 +8,7 @@ import java.util.Map;
 
 /**
  * Models a finite state machine after the mealy model. For usage, see WoerterbuchTranslator.extractTranslations().
- * @author Sebastian Graf
+ * @author Eike Karsten Schlicht
  */
 public class MealyMachine<TState extends Enum<TState>, TInput, TOutput> {
 

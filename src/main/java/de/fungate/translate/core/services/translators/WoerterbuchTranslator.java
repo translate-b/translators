@@ -12,6 +12,7 @@ import fj.P2;
 import fj.data.Either;
 import fj.data.Option;
 import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.conn.ConnectTimeoutException;
 import org.apache.log4j.Logger;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -80,7 +81,13 @@ public class WoerterbuchTranslator implements Translator {
 		Either<String, Exception> content = curler.get(urlFor(term));
         if (content.isRight()) {
             // Get request failed and the right type is present. We can lookup the Exception
-            LOG.warn("GET request failed.", content.right().value());
+            Exception e = content.right().value();
+            if (e instanceof ConnectTimeoutException) {
+                // Woerterbuch isn't as reliable as it should be.
+                LOG.warn("Connection timed out.");
+            } else {
+                LOG.warn("GET request failed.", e);
+            }
             return Collections.emptySet();
         }
 
@@ -132,7 +139,7 @@ public class WoerterbuchTranslator implements Translator {
         };
     }
 
-    private static F<Element, P2<State, Option<Translation>>> lookOutForDirectHitsHeader = new F<Element, P2<State, Option<Translation>>>() {
+    private static final F<Element, P2<State, Option<Translation>>> lookOutForDirectHitsHeader = new F<Element, P2<State, Option<Translation>>>() {
         public P2<State, Option<Translation>> f(Element tr) {
             Element subHeader = tr.select("td.standard").first();
             State nextState = isDirectHitsHeader(subHeader)
@@ -156,7 +163,7 @@ public class WoerterbuchTranslator implements Translator {
         };
     }
 
-    private static F<Element, P2<State, Option<Translation>>> doNothing = new F<Element, P2<State, Option<Translation>>>() {
+    private static final F<Element, P2<State, Option<Translation>>> doNothing = new F<Element, P2<State, Option<Translation>>>() {
         public P2<State, Option<Translation>> f(Element tr) {
             return p(State.FINISHED, Option.<Translation>none());
         }
@@ -181,11 +188,15 @@ public class WoerterbuchTranslator implements Translator {
     }
 
     private static String filterGerman(String term) {
-        return FILTER_GERMAN.matcher(term).replaceAll("").trim();
+        return FILTER_GERMAN.matcher(term).replaceAll("")
+                .replaceAll(Regexes.WHITESPACE, " ") // normalize whitespace
+                .trim();
     }
 
     private static String filterEnglish(String term) {
-        return FILTER_ENGLISH.matcher(term).replaceAll("").trim();
+        return FILTER_ENGLISH.matcher(term).replaceAll("")
+                .replaceAll(Regexes.WHITESPACE, " ") // normalize whitespace
+                .trim();
     }
 
     @Override

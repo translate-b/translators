@@ -1,8 +1,8 @@
 package de.fungate.translate.core.services;
 
-import java.io.InputStream;
-
 import fj.data.Either;
+
+import java.io.InputStream;
 
 
 /**
