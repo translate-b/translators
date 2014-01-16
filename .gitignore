@@ -5,4 +5,4 @@
 !build.sbt
 !src/
 !src/**
-src/**.DS_Store
+**.DS_Store
