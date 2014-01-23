@@ -208,7 +208,7 @@ public class WoerterbuchTranslator implements Translator {
         return "woerterbuch.info";
     }
 
-    private enum State {
+    public enum State {
 
         /**
          * Last table row was before the relevant section
