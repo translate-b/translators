@@ -48,6 +48,7 @@ public class DictccTranslator implements Translator{
 
     @Inject
     public DictccTranslator(Curler curler) {
+    	System.out.println("hi");
         this.curler = curler;
 	}
     
