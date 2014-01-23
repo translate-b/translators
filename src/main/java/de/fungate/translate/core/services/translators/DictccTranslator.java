@@ -81,7 +81,7 @@ public class DictccTranslator implements Translator{
 	 */
 	@Override
 	public String getProvider() {
-		return "dict.cc";
+		return "dict.dd";
 	}
     
     /**
