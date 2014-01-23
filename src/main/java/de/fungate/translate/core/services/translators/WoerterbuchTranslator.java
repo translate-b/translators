@@ -102,9 +102,9 @@ public class WoerterbuchTranslator implements Translator {
         MealyMachine<State, Element, Option<Translation>> parser = MealyMachine.fromTransitions(
                 State.BEFORE,
                 when(State.BEFORE).then(lookOutForSourceLangHeader(source)),
-                when(State.IN_SECTION).then(lookOutForDirectHitsHeader),
+                when(State.IN_SECTION).then(lookOutForDirectHitsHeader()),
                 when(State.IN_DIRECT_HITS).then(parseDirectHits(source)),
-                when(State.FINISHED).then(doNothing)
+                when(State.FINISHED).then(doNothing())
         );
 
         // Just feed the relevant elements into the machine until it is finished.
@@ -139,14 +139,16 @@ public class WoerterbuchTranslator implements Translator {
         };
     }
 
-    private final F<Element, P2<State, Option<Translation>>> lookOutForDirectHitsHeader = new F<Element, P2<State, Option<Translation>>>() {
-        public P2<State, Option<Translation>> f(Element tr) {
-            Element subHeader = tr.select("td.standard").first();
-            State nextState = isDirectHitsHeader(subHeader)
-                    ? State.IN_DIRECT_HITS : State.IN_SECTION;
-            return p(nextState, Option.<Translation>none());
-        }
-    };
+    private F<Element, P2<State, Option<Translation>>> lookOutForDirectHitsHeader() {
+        return new F<Element, P2<State, Option<Translation>>>() {
+            public P2<State, Option<Translation>> f(Element tr) {
+                Element subHeader = tr.select("td.standard").first();
+                State nextState = isDirectHitsHeader(subHeader)
+                        ? State.IN_DIRECT_HITS : State.IN_SECTION;
+                return p(nextState, Option.<Translation>none());
+            }
+        };
+    }
 
     private F<Element, P2<State, Option<Translation>>> parseDirectHits(final SourceLanguage source) {
         return new F<Element, P2<State, Option<Translation>>>() {
@@ -163,11 +165,13 @@ public class WoerterbuchTranslator implements Translator {
         };
     }
 
-    private final F<Element, P2<State, Option<Translation>>> doNothing = new F<Element, P2<State, Option<Translation>>>() {
-        public P2<State, Option<Translation>> f(Element tr) {
-            return p(State.FINISHED, Option.<Translation>none());
-        }
-    };
+    private F<Element, P2<State, Option<Translation>>> doNothing() {
+        return new F<Element, P2<State, Option<Translation>>>() {
+            public P2<State, Option<Translation>> f(Element tr) {
+                return p(State.FINISHED, Option.<Translation>none());
+            }
+        };
+    }
 
     private static boolean isSourceLangHeader(Element header, SourceLanguage lang) {
         if (header == null) {
