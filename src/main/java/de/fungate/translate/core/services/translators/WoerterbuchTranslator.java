@@ -139,7 +139,7 @@ public class WoerterbuchTranslator implements Translator {
         };
     }
 
-    private static final F<Element, P2<State, Option<Translation>>> lookOutForDirectHitsHeader = new F<Element, P2<State, Option<Translation>>>() {
+    private final F<Element, P2<State, Option<Translation>>> lookOutForDirectHitsHeader = new F<Element, P2<State, Option<Translation>>>() {
         public P2<State, Option<Translation>> f(Element tr) {
             Element subHeader = tr.select("td.standard").first();
             State nextState = isDirectHitsHeader(subHeader)
@@ -163,7 +163,7 @@ public class WoerterbuchTranslator implements Translator {
         };
     }
 
-    private static final F<Element, P2<State, Option<Translation>>> doNothing = new F<Element, P2<State, Option<Translation>>>() {
+    private final F<Element, P2<State, Option<Translation>>> doNothing = new F<Element, P2<State, Option<Translation>>>() {
         public P2<State, Option<Translation>> f(Element tr) {
             return p(State.FINISHED, Option.<Translation>none());
         }
