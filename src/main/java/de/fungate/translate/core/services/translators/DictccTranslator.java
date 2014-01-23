@@ -48,7 +48,6 @@ public class DictccTranslator implements Translator{
 
     @Inject
     public DictccTranslator(Curler curler) {
-    	System.out.println("hi");
         this.curler = curler;
 	}
     
@@ -82,7 +81,7 @@ public class DictccTranslator implements Translator{
 	 */
 	@Override
 	public String getProvider() {
-		return "dict.dd";
+		return "dict.cc";
 	}
     
     /**
