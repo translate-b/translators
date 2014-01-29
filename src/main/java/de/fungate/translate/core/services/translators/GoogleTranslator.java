@@ -177,7 +177,7 @@ public class GoogleTranslator implements Translator {
 
 	@Override
 	public String getProvider() {
-		return "translate.google.com";
+		return "translate.googl.com";
 	}
 
 }
